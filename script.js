@@ -36,6 +36,33 @@ function updateDynamicBackground() {
 
   if (nearest?.dataset.bg) {
     hero.style.backgroundImage = `url(${nearest.dataset.bg})`;
+const movieGrid = document.getElementById('movieGrid');
+
+if (MOVIES.length > 0) {
+  hero.style.backgroundImage = `url(${MOVIES[0].poster_url})`;
+}
+
+function getNearestCardByViewport() {
+  let nearest = cards[0];
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  cards.forEach((card) => {
+    const rect = card.getBoundingClientRect();
+    const center = Math.abs(rect.top + rect.height / 2 - window.innerHeight / 2);
+    if (center < nearestDistance) {
+      nearestDistance = center;
+      nearest = card;
+    }
+  });
+  return nearest;
+}
+
+function updateDynamicBackground() {
+  const card = getNearestCardByViewport();
+  if (!card) return;
+  const bg = card.dataset.bg;
+  if (bg) {
+    hero.style.backgroundImage = `url(${bg})`;
+
   }
 }
 
@@ -43,6 +70,8 @@ window.addEventListener('scroll', updateDynamicBackground);
 
 cards.forEach((card, idx) => {
   card.style.animationDelay = `${idx * 35}ms`;
+cards.forEach((card) => {
+
   const teaser = card.dataset.teaser;
   const preview = card.querySelector('.preview-video');
 
@@ -63,11 +92,15 @@ cards.forEach((card, idx) => {
 });
 
 closeModalBtn?.addEventListener('click', () => {
+=======
+closeModalBtn.addEventListener('click', () => {
+
   modal.classList.add('hidden');
   teaserFrame.src = '';
 });
 
 modal?.addEventListener('click', (event) => {
+modal.addEventListener('click', (event) => {
   if (event.target === modal) {
     modal.classList.add('hidden');
     teaserFrame.src = '';
@@ -109,6 +142,18 @@ document.querySelectorAll('.watchlist-btn').forEach((btn) => {
       return;
     }
 
+    const category = btn.dataset.category;
+
+    cards.forEach((card) => {
+      const match = category === 'All' || card.dataset.category === category;
+      card.style.display = match ? '' : 'none';
+    });
+  });
+});
+
+document.querySelectorAll('.watchlist-btn').forEach((btn) => {
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
     const movieId = btn.dataset.id;
     const res = await fetch('toggle_watchlist.php', {
       method: 'POST',
@@ -118,11 +163,21 @@ document.querySelectorAll('.watchlist-btn').forEach((btn) => {
 
     const data = await res.json();
     if (data.status === 'added') {
+
       btn.textContent = 'Saved';
+      btn.textContent = 'In Watchlist';
       btn.classList.add('added');
     } else if (data.status === 'removed') {
       btn.textContent = '+ Watchlist';
       btn.classList.remove('added');
     }
   });
+});
+
+document.getElementById('scrollLeft')?.addEventListener('click', () => {
+  movieGrid.scrollBy({ left: -400, behavior: 'smooth' });
+});
+
+document.getElementById('scrollRight')?.addEventListener('click', () => {
+  movieGrid.scrollBy({ left: 400, behavior: 'smooth' });
 });
