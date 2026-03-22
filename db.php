@@ -2,7 +2,6 @@
 $host = 'localhost';
 $user = 'root';
 $pass = '';
-$dbName = 'movieshub';
 $dbName = 'movie_recommendation';
 
 $conn = new mysqli($host, $user, $pass);
@@ -30,11 +29,6 @@ $conn->query(
         title VARCHAR(160) NOT NULL,
         category VARCHAR(60) NOT NULL,
         year_released SMALLINT DEFAULT NULL,
-    'CREATE TABLE IF NOT EXISTS movies (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title VARCHAR(150) NOT NULL,
-        category VARCHAR(60) NOT NULL,
-
         description TEXT,
         poster_url VARCHAR(255) NOT NULL,
         teaser_url VARCHAR(255) NOT NULL,
@@ -52,15 +46,26 @@ $conn->query(
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY unique_user_movie (user_id, movie_id),
         CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        movie_id INT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY unique_movie (movie_id),
-
         CONSTRAINT fk_watchlist_movie FOREIGN KEY (movie_id) REFERENCES movies(id) ON DELETE CASCADE
     ) ENGINE=InnoDB'
 );
 
-$seedCount = (int) (($conn->query('SELECT COUNT(*) total FROM movies')->fetch_assoc()['total']) ?? 0);
+$indexCheck = $conn->prepare("SELECT COUNT(*) AS total FROM information_schema.statistics WHERE table_schema = ? AND table_name = 'watchlist' AND index_name = 'unique_movie'");
+if ($indexCheck) {
+    $indexCheck->bind_param('s', $dbName);
+    $indexCheck->execute();
+    $indexResult = $indexCheck->get_result();
+    $legacyIndexExists = (int) ($indexResult->fetch_assoc()['total'] ?? 0) > 0;
+    $indexCheck->close();
+
+    if ($legacyIndexExists) {
+        $conn->query('ALTER TABLE watchlist DROP INDEX unique_movie');
+    }
+}
+
+$seedCountResult = $conn->query('SELECT COUNT(*) AS total FROM movies');
+$seedCount = $seedCountResult ? (int) $seedCountResult->fetch_assoc()['total'] : 0;
+
 if ($seedCount === 0) {
     $seedMovies = [
         ['Interstellar', 'Sci-Fi', 2014, 'A desperate mission through space and time to save Earth.', 'https://images.unsplash.com/photo-1472457897821-70d3819a0e24?auto=format&fit=crop&w=1200&q=80', 'https://www.youtube.com/embed/zSWdZVtXT7E', 'https://media.istockphoto.com/id/1480591826/video/planet-earth-rotating-space-stock-video.mp4?s=mp4-640x640-is&k=20&c=N6GpocF74x5AJRDigw1k3DybZ0SqnX5nGooy2cuglRc=', 8.7],
@@ -84,33 +89,12 @@ if ($seedCount === 0) {
     ];
 
     $stmt = $conn->prepare('INSERT INTO movies (title, category, year_released, description, poster_url, teaser_url, teaser_preview_url, rating) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    foreach ($seedMovies as $movie) {
-        $stmt->bind_param('ssissssd', $movie[0], $movie[1], $movie[2], $movie[3], $movie[4], $movie[5], $movie[6], $movie[7]);
-        $stmt->execute();
-    }
-    $stmt->close();
-  
-$seedCountResult = $conn->query('SELECT COUNT(*) AS total FROM movies');
-$seedCount = $seedCountResult ? (int) $seedCountResult->fetch_assoc()['total'] : 0;
-
-if ($seedCount === 0) {
-    $seedMovies = [
-        ['Interstellar', 'Sci-Fi', 'A team travels through a wormhole to save humanity.', 'https://images.unsplash.com/photo-1472457897821-70d3819a0e24?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/zSWdZVtXT7E', 'https://media.istockphoto.com/id/1480591826/video/planet-earth-rotating-space-stock-video.mp4?s=mp4-640x640-is&k=20&c=N6GpocF74x5AJRDigw1k3DybZ0SqnX5nGooy2cuglRc=', 8.7],
-        ['The Conjuring', 'Horror', 'Paranormal investigators help a family terrorized by dark forces.', 'https://images.unsplash.com/photo-1509248961158-e54f6934749c?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/k10ETZ41q5o', 'https://media.istockphoto.com/id/1353802544/video/scary-dark-corridor-with-flickering-lights-and-smoke.mp4?s=mp4-640x640-is&k=20&c=R9fR-r1lYGMYxVFhJfH_DMFtR1j3rxqedkQSEvAEfVI=', 7.8],
-        ['Se7en', 'Thriller', 'Two detectives hunt a serial killer using seven deadly sins.', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/znmZoVkCjpI', 'https://media.istockphoto.com/id/1477124108/video/night-city-traffic.mp4?s=mp4-640x640-is&k=20&c=VYz0l1E4mda0OrD5z8M90oCbGyF_F7fsRG3Gzdh0dX8=', 8.6],
-        ['Inception', 'Action', 'A thief steals secrets through dream-sharing technology.', 'https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/YoHD9XEInc0', 'https://media.istockphoto.com/id/1465945996/video/neon-city-futuristic-background.mp4?s=mp4-640x640-is&k=20&c=UU0h4qt77AsUYxxYOlK6i6f9_ZNDQQgQvFjQW0fvkY4=', 8.8],
-        ['Coco', 'Animation', 'A young musician explores the Land of the Dead.', 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/xlnPHQ3TLX8', 'https://media.istockphoto.com/id/1425402807/video/colorful-confetti-background.mp4?s=mp4-640x640-is&k=20&c=21VYVnX6jttA4y7sMZDXMpaWQ2qj8qV6PdYriRO6S4A=', 8.4],
-        ['The Notebook', 'Romance', 'A timeless love story that spans decades.', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80', 'https://www.youtube.com/embed/FC6biTjEyZw', 'https://media.istockphoto.com/id/1338053819/video/romantic-sunset-beach.mp4?s=mp4-640x640-is&k=20&c=8IrA3YUN_miMdv4bcoOMw0yd5QtbFHLQ5lmh3Asf7f4=', 7.9],
-    ];
-
-    $stmt = $conn->prepare('INSERT INTO movies (title, category, description, poster_url, teaser_url, teaser_preview_url, rating) VALUES (?, ?, ?, ?, ?, ?, ?)');
     if ($stmt) {
         foreach ($seedMovies as $movie) {
-            $stmt->bind_param('ssssssd', $movie[0], $movie[1], $movie[2], $movie[3], $movie[4], $movie[5], $movie[6]);
+            $stmt->bind_param('ssissssd', $movie[0], $movie[1], $movie[2], $movie[3], $movie[4], $movie[5], $movie[6], $movie[7]);
             $stmt->execute();
         }
         $stmt->close();
     }
-  
 }
 ?>
